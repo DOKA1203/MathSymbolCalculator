@@ -27,6 +27,9 @@ sealed class MathSymbol {
     data class Sin(val argument: MathSymbol) : MathSymbol()
     data class Cos(val argument: MathSymbol) : MathSymbol()
     data class Tan(val argument: MathSymbol) : MathSymbol()
+    data class Cot(val argument: MathSymbol) : MathSymbol()
+    data class Sec(val argument: MathSymbol) : MathSymbol()
+    data class Csc(val argument: MathSymbol) : MathSymbol()
 }
 
 class Expression(private val symbol: MathSymbol) {
@@ -108,6 +111,9 @@ class Expression(private val symbol: MathSymbol) {
         is MathSymbol.Sin -> "sin(${Expression(symbol.argument)})"
         is MathSymbol.Cos -> "cos(${Expression(symbol.argument)})"
         is MathSymbol.Tan -> "tan(${Expression(symbol.argument)})"
+        is MathSymbol.Cot -> "cot(${Expression(symbol.argument)})"
+        is MathSymbol.Sec -> "sec(${Expression(symbol.argument)})"
+        is MathSymbol.Csc -> "csc(${Expression(symbol.argument)})"
     }
 
 
@@ -164,6 +170,21 @@ class Expression(private val symbol: MathSymbol) {
             is MathSymbol.Sin -> sin(evaluateSymbol(symbol.argument, context))
             is MathSymbol.Cos -> cos(evaluateSymbol(symbol.argument, context))
             is MathSymbol.Tan -> tan(evaluateSymbol(symbol.argument, context))
+            is MathSymbol.Cot -> {
+                val tanValue = tan(evaluateSymbol(symbol.argument, context))
+                if (tanValue == 0.0) throw ArithmeticException("cot 정의역 오류")
+                1.0 / tanValue
+            }
+            is MathSymbol.Sec -> {
+                val cosValue = cos(evaluateSymbol(symbol.argument, context))
+                if (cosValue == 0.0) throw ArithmeticException("sec 정의역 오류")
+                1.0 / cosValue
+            }
+            is MathSymbol.Csc -> {
+                val sinValue = sin(evaluateSymbol(symbol.argument, context))
+                if (sinValue == 0.0) throw ArithmeticException("csc 정의역 오류")
+                1.0 / sinValue
+            }
         }
     }
 }
@@ -200,7 +221,7 @@ fun main() {
                 MathSymbol.Number(2),
                 MathSymbol.Number(3)
             ),
-            MathSymbol.Root(MathSymbol.Number(9))
+            MathSymbol.Exponent(MathSymbol.Root(MathSymbol.Number(9)), MathSymbol.Number(2))
         )
     )
     println("\n3. 지수 및 근호: $exponentRoot = ${exponentRoot.evaluate()}")
