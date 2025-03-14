@@ -32,7 +32,7 @@ sealed class MathSymbol {
     data class Csc(val argument: MathSymbol) : MathSymbol()
 }
 
-class Expression(private val symbol: MathSymbol) {
+class Expression(private val mathSymbol: MathSymbol) {
     private fun wrapIfComplex(symbol: MathSymbol): String {
         return when(symbol) {
             is MathSymbol.Number,
@@ -46,21 +46,71 @@ class Expression(private val symbol: MathSymbol) {
     }
 
     fun simplify(): Expression {
-        return Expression(when (symbol) {
+        return Expression(simplifySymbol(mathSymbol))
+    }
+    private fun simplifySymbol(symbol: MathSymbol): MathSymbol {
+        return when (symbol) {
             is MathSymbol.Fraction -> simplifyFraction(symbol)
+            is MathSymbol.Root -> simplifyRoot(symbol)
+            is MathSymbol.Add -> simplifyAdd(symbol)
+            is MathSymbol.Multiply -> simplifyMultiply(symbol)
             else -> symbol
-        })
+        }
+    }
+    private fun simplifyMultiply(symbol: MathSymbol.Multiply): MathSymbol {
+
+        val left = simplifySymbol(symbol.left)
+        val right = simplifySymbol(symbol.right)
+
+        if (left is MathSymbol.Fraction && right is MathSymbol.Fraction) {
+            val leftNum = left.numerator
+            val rightNum = right.numerator
+            val leftDen = left.denominator
+            val rightDen = right.denominator
+
+            if (leftNum is MathSymbol.Number && leftDen is MathSymbol.Number && rightNum is MathSymbol.Number && rightDen is MathSymbol.Number) {
+                return simplifySymbol(MathSymbol.Fraction(MathSymbol.Number(leftNum.value * rightNum.value), MathSymbol.Number(leftDen.value * rightDen.value)))
+            }
+        } else if (left is MathSymbol.Fraction && right is MathSymbol.Number) {
+            val leftNum = left.numerator
+            if  (leftNum is MathSymbol.Number) {
+                return MathSymbol.Fraction(MathSymbol.Number(leftNum.value * right.value), left.denominator)
+            }
+        } else if (right is MathSymbol.Fraction &&  left is MathSymbol.Number) {
+            val rightNum = right.numerator
+            if  (rightNum is MathSymbol.Number) {
+                return MathSymbol.Fraction(MathSymbol.Number(rightNum.value * left.value), right.denominator)
+            }
+        } else if (right is MathSymbol.Number && left is MathSymbol.Number) {
+
+            return MathSymbol.Number(right.value * left.value)
+        }
+        return MathSymbol.Multiply(left, right)
+    }
+    private fun simplifyAdd(symbol: MathSymbol.Add): MathSymbol {
+        val left = simplifySymbol(symbol.left)
+        val right = simplifySymbol(symbol.right)
+        if (right is MathSymbol.Number && left is MathSymbol.Number) {
+            return MathSymbol.Number(right.value + left.value)
+        }
+        return MathSymbol.Add(left, right)
     }
 
-    private fun simplifyFraction(fraction: MathSymbol.Fraction): MathSymbol.Fraction {
+
+    private fun simplifyFraction(fraction: MathSymbol.Fraction): MathSymbol {
         fun gcd(a: Int, b: Int): Int = if (b == 0) a else gcd(b, a % b)
+        val fractionNum = simplifySymbol(fraction.numerator)
+        val fractionDen = simplifySymbol(fraction.denominator)
 
         return when {
-            fraction.numerator is MathSymbol.Number && fraction.denominator is MathSymbol.Number -> {
-                val num = fraction.numerator.value
-                val den = fraction.denominator.value
-                val commonDivisor = gcd(Math.abs(num), Math.abs(den))
+            fractionNum is MathSymbol.Number && fractionDen is MathSymbol.Number -> {
+                val num = fractionNum.value
+                val den = fractionDen.value
+                val commonDivisor = gcd(abs(num), abs(den))
                 val sign = if (den < 0) -1 else 1
+                if (sign * den / commonDivisor == 1) {
+                    return MathSymbol.Number(sign * num / commonDivisor)
+                }
                 MathSymbol.Fraction(
                     MathSymbol.Number(sign * num / commonDivisor),
                     MathSymbol.Number(sign * den / commonDivisor)
@@ -69,29 +119,53 @@ class Expression(private val symbol: MathSymbol) {
             else -> fraction
         }
     }
+    private fun simplifyRoot(root: MathSymbol.Root): MathSymbol {
+        if (root.radicand is MathSymbol.Number) {
+            var radicandValue = root.radicand.value
+            val degreeValue = (root.degree as? MathSymbol.Number)?.value ?: return root // 루트 차수가 숫자가 아닐 경우 그대로 반환
 
-    override fun toString(): String = when (symbol) {
-        is MathSymbol.Number -> symbol.value.toString()
-        is MathSymbol.Decimal -> {
-            if (symbol.value % 1.0 == 0.0) {
-                symbol.value.toInt().toString()
+            var factor = 1
+
+            for (i in 2..radicandValue.toDouble().pow(1.0 / degreeValue).toInt()) {
+                while (radicandValue % i.toDouble().pow(degreeValue.toDouble()).toInt() == 0) {
+                    factor *= i
+                    radicandValue /= i.toDouble().pow(degreeValue.toDouble()).toInt()
+                }
+            }
+
+            return if (factor > 1) {
+
+                if (radicandValue == 1) return MathSymbol.Number(factor)
+                MathSymbol.Multiply(MathSymbol.Number(factor), MathSymbol.Root(MathSymbol.Number(radicandValue), root.degree))
             } else {
-                "%.4f".format(symbol.value).trimEnd('0').trimEnd('.')
+                root
             }
         }
-        is MathSymbol.Variable -> symbol.name
+        return root
+    }
+
+    override fun toString(): String = when (mathSymbol) {
+        is MathSymbol.Number -> mathSymbol.value.toString()
+        is MathSymbol.Decimal -> {
+            if (mathSymbol.value % 1.0 == 0.0) {
+                mathSymbol.value.toInt().toString()
+            } else {
+                "%.4f".format(mathSymbol.value).trimEnd('0').trimEnd('.')
+            }
+        }
+        is MathSymbol.Variable -> mathSymbol.name
         MathSymbol.E -> "e"
         MathSymbol.PI -> "π"
         MathSymbol.ImaginaryUnit -> "i"
 
         is MathSymbol.Fraction -> {
-            "${wrapIfComplex(symbol.numerator)}/${wrapIfComplex(symbol.denominator)}"
+            "${wrapIfComplex(mathSymbol.numerator)}/${wrapIfComplex(mathSymbol.denominator)}"
         }
         is MathSymbol.Log -> {
-            val baseRepr = Expression(symbol.base)
-            val argRepr = Expression(symbol.argument)
+            val baseRepr = Expression(mathSymbol.base)
+            val argRepr = Expression(mathSymbol.argument)
 
-            when (symbol.base) {
+            when (mathSymbol.base) {
                 MathSymbol.E -> "ln($argRepr)"
 
                 // 밑이 단순한 숫자/변수인 경우
@@ -101,25 +175,25 @@ class Expression(private val symbol: MathSymbol) {
                 else -> "log_{${baseRepr}}($argRepr)"
             }
         }
-        is MathSymbol.Add -> "${Expression(symbol.left)} + ${Expression(symbol.right)}"
-        is MathSymbol.Multiply -> "${wrapIfComplex(symbol.left)} * ${wrapIfComplex(symbol.right)}"
-        is MathSymbol.Exponent -> "${wrapIfComplex(symbol.base)}^${wrapIfComplex(symbol.power)}"
+        is MathSymbol.Add -> "${Expression(mathSymbol.left)} + ${Expression(mathSymbol.right)}"
+        is MathSymbol.Multiply -> "${wrapIfComplex(mathSymbol.left)} * ${wrapIfComplex(mathSymbol.right)}"
+        is MathSymbol.Exponent -> "${wrapIfComplex(mathSymbol.base)}^${wrapIfComplex(mathSymbol.power)}"
         is MathSymbol.Root -> when {
-            (symbol.degree as? MathSymbol.Number)?.value == 2 -> "√${wrapIfComplex(symbol.radicand)}"
-            else -> "${Expression(symbol.degree)}√${wrapIfComplex(symbol.radicand)}"
+            (mathSymbol.degree as? MathSymbol.Number)?.value == 2 -> "√${wrapIfComplex(mathSymbol.radicand)}"
+            else -> "${Expression(mathSymbol.degree)}√${wrapIfComplex(mathSymbol.radicand)}"
         }
-        is MathSymbol.Sin -> "sin(${Expression(symbol.argument)})"
-        is MathSymbol.Cos -> "cos(${Expression(symbol.argument)})"
-        is MathSymbol.Tan -> "tan(${Expression(symbol.argument)})"
-        is MathSymbol.Cot -> "cot(${Expression(symbol.argument)})"
-        is MathSymbol.Sec -> "sec(${Expression(symbol.argument)})"
-        is MathSymbol.Csc -> "csc(${Expression(symbol.argument)})"
+        is MathSymbol.Sin -> "sin(${Expression(mathSymbol.argument)})"
+        is MathSymbol.Cos -> "cos(${Expression(mathSymbol.argument)})"
+        is MathSymbol.Tan -> "tan(${Expression(mathSymbol.argument)})"
+        is MathSymbol.Cot -> "cot(${Expression(mathSymbol.argument)})"
+        is MathSymbol.Sec -> "sec(${Expression(mathSymbol.argument)})"
+        is MathSymbol.Csc -> "csc(${Expression(mathSymbol.argument)})"
     }
 
 
     fun evaluate(context: Map<String, Double> = emptyMap()): Double? {
         return try {
-            evaluateSymbol(symbol, context).toBigDecimal().setScale(10, RoundingMode.HALF_UP).toDouble()
+            evaluateSymbol(mathSymbol, context).toBigDecimal().setScale(10, RoundingMode.HALF_UP).toDouble()
         } catch (e: Exception) {
             null
         }
@@ -190,114 +264,17 @@ class Expression(private val symbol: MathSymbol) {
 }
 
 fun main() {
-    // 1. 기본 사칙연산
-    val basicArithmetic = Expression(
-        MathSymbol.Add(
-            MathSymbol.Number(2),
-            MathSymbol.Multiply(
-                MathSymbol.Number(3),
-                MathSymbol.Number(4)
-            )
-        )
-    )
-    println("1. 기본 연산: $basicArithmetic = ${basicArithmetic.evaluate()}")
-
-    // 2. 분수 약분 예제
-    val fraction = Expression(
-        MathSymbol.Fraction(
-            MathSymbol.Number(12),
-            MathSymbol.Number(18)
-        )
-    )
-    println("\n2. 분수 약분:")
-    println("원본: $fraction")
-    println("약분: ${fraction.simplify()}")
-    println("계산: ${fraction.simplify().evaluate()}")
-
-    // 3. 지수 및 근호
-    val exponentRoot = Expression(
-        MathSymbol.Add(
-            MathSymbol.Exponent(
-                MathSymbol.Number(2),
-                MathSymbol.Number(3)
-            ),
-            MathSymbol.Exponent(MathSymbol.Root(MathSymbol.Number(9)), MathSymbol.Number(2))
-        )
-    )
-    println("\n3. 지수 및 근호: $exponentRoot = ${exponentRoot.evaluate()}")
-
-    // 4. 다양한 로그
-    val logExamples = listOf(
-        Expression(MathSymbol.Log(MathSymbol.Exponent(MathSymbol.E, MathSymbol.Number(5)))),
-        Expression(MathSymbol.Log(MathSymbol.Number(100), MathSymbol.Number(10))),
-        Expression(MathSymbol.Log(
-            MathSymbol.Number(8),
-            MathSymbol.Fraction(MathSymbol.Number(1), MathSymbol.Number(2)))
-        )
-    )
-    println("\n4. 로그 예제:")
-    logExamples.forEach { println("$it = ${it.evaluate()}") }
-
-    // 5. 삼각함수
-    val trigExpr = Expression(
-        MathSymbol.Add(
-            MathSymbol.Sin(
-                MathSymbol.Fraction(MathSymbol.PI, MathSymbol.Number(2))
-            ),
-            MathSymbol.Multiply(
-                MathSymbol.Cos(MathSymbol.PI),
-                MathSymbol.Tan(
-                    MathSymbol.Fraction(MathSymbol.PI, MathSymbol.Number(4))
-                )
-            )
-        )
-    )
-    println("\n5. 삼각함수: $trigExpr = ${trigExpr.evaluate()}")
-
-    // 6. 변수 치환
-    val quadratic = Expression(
-        MathSymbol.Add(
-            MathSymbol.Exponent(MathSymbol.Variable("x"), MathSymbol.Number(2)),
-            MathSymbol.Add(
-                MathSymbol.Multiply(MathSymbol.Number(3), MathSymbol.Variable("x")),
-                MathSymbol.Number(2)
-            )
-        )
-    )
-    val context = mapOf("x" to 3.0)
-    println("\n6. 변수 치환:")
-    println("수식: $quadratic")
-    println("x=3 일 때: ${quadratic.evaluate(context)}")
-
-    // 7. 소수 연산
-    val decimalExpr = Expression(
-        MathSymbol.Multiply(
-            MathSymbol.Decimal(3.5),
-            MathSymbol.Decimal(2.0)
-        )
-    )
-    println("\n7. 소수 연산: $decimalExpr = ${decimalExpr.evaluate()}")
-
-    // 8. 복합 표현식
-    val complexExpr = Expression(
-        MathSymbol.Add(
-            MathSymbol.Exponent(
-                MathSymbol.E,
-                MathSymbol.Fraction(MathSymbol.PI, MathSymbol.Number(2))
-            ),
-            MathSymbol.Multiply(
-                MathSymbol.Log(MathSymbol.Number(8), MathSymbol.Number(2)),
+    val cases = listOf(
+        Expression(
+            MathSymbol.Fraction(
+                MathSymbol.Multiply(
+                    MathSymbol.Number(5),
+                    MathSymbol.Number(5)
+                ),
                 MathSymbol.Root(MathSymbol.Number(16))
             )
-        )
+        ),
     )
-    println("\n8. 복합 표현식: $complexExpr ≈ ${complexExpr.evaluate()}")
 
-    // 9. 오류 케이스
-    val errorCases = listOf(
-        Expression(MathSymbol.Fraction(MathSymbol.Number(5), MathSymbol.Number(0))),
-        Expression(MathSymbol.Add(MathSymbol.Variable("y"), MathSymbol.Number(1)))
-    )
-    println("\n9. 오류 케이스:")
-    errorCases.forEach { println("$it = ${it.evaluate()}") }
+    cases.forEach { println("$it = ${it.simplify()} = ${it.evaluate()}") } // (5 * 5)/(√16) = 25/4 = 6.25
 }
