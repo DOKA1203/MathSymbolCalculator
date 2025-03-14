@@ -11,7 +11,7 @@
   - 약분 가능한 분수
   - 임의 밑 로그
   - 지수/근호 연산
-  - 삼각함수 (sin, cos, tan)
+  - 삼각함수 (sin, cos, tan, csc, sec, cot)
   - 사칙연산 (+, *)
 
 - **고급 기능**:
@@ -51,10 +51,10 @@ println(분수.simplify()) // 결과: 2/3
 
 ### 수치 계산
 ```kotlin
-val 2cha_bang = Expression(
+val Echa_bang = Expression(
     MathSymbol.Exponent(MathSymbol.Variable("x"), MathSymbol.Number(2))
 )
-2cha_bang.evaluate(mapOf("x" to 4.0)) // 결과: 16.0
+Echa_bang.evaluate(mapOf("x" to 4.0)) // 결과: 16.0
 ```
 ## 예제 코드
 ### 기본 사칙연산
