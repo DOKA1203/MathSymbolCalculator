@@ -58,7 +58,6 @@ class Expression(private val mathSymbol: MathSymbol) {
         }
     }
     private fun simplifyMultiply(symbol: MathSymbol.Multiply): MathSymbol {
-
         val left = simplifySymbol(symbol.left)
         val right = simplifySymbol(symbol.right)
 
@@ -74,12 +73,12 @@ class Expression(private val mathSymbol: MathSymbol) {
         } else if (left is MathSymbol.Fraction && right is MathSymbol.Number) {
             val leftNum = left.numerator
             if  (leftNum is MathSymbol.Number) {
-                return MathSymbol.Fraction(MathSymbol.Number(leftNum.value * right.value), left.denominator)
+                return simplifySymbol(MathSymbol.Fraction(MathSymbol.Number(leftNum.value * right.value), left.denominator))
             }
         } else if (right is MathSymbol.Fraction &&  left is MathSymbol.Number) {
             val rightNum = right.numerator
             if  (rightNum is MathSymbol.Number) {
-                return MathSymbol.Fraction(MathSymbol.Number(rightNum.value * left.value), right.denominator)
+                return simplifySymbol(MathSymbol.Fraction(MathSymbol.Number(rightNum.value * left.value), right.denominator))
             }
         } else if (right is MathSymbol.Number && left is MathSymbol.Number) {
 
@@ -90,11 +89,41 @@ class Expression(private val mathSymbol: MathSymbol) {
     private fun simplifyAdd(symbol: MathSymbol.Add): MathSymbol {
         val left = simplifySymbol(symbol.left)
         val right = simplifySymbol(symbol.right)
-        if (right is MathSymbol.Number && left is MathSymbol.Number) {
-            return MathSymbol.Number(right.value + left.value)
+
+        // 두 항이 모두 일반 숫자일 경우
+        if (left is MathSymbol.Number && right is MathSymbol.Number) {
+            return MathSymbol.Number(left.value + right.value)
         }
+
+        // 숫자를 분수로 변환하는 헬퍼 함수 (이미 Fraction 인 경우 그대로 반환)
+        fun toFraction(ms: MathSymbol): MathSymbol.Fraction? {
+            return when(ms) {
+                is MathSymbol.Fraction -> ms
+                is MathSymbol.Number -> MathSymbol.Fraction(ms, MathSymbol.Number(1))
+                else -> null
+            }
+        }
+
+        val leftFraction = toFraction(left)
+        val rightFraction = toFraction(right)
+
+        if (leftFraction != null && rightFraction != null) {
+            // 분수 형태: leftFraction = a/b, rightFraction = c/d
+            if (leftFraction.numerator is MathSymbol.Number && leftFraction.denominator is MathSymbol.Number &&
+                rightFraction.numerator is MathSymbol.Number && rightFraction.denominator is MathSymbol.Number) {
+
+                val newNumerator = leftFraction.numerator.value * rightFraction.denominator.value + rightFraction.numerator.value * leftFraction.denominator.value
+                val newDenominator = leftFraction.denominator.value * rightFraction.denominator.value
+
+                // 새 분수를 간소화해서 반환
+                return simplifyFraction(MathSymbol.Fraction(MathSymbol.Number(newNumerator), MathSymbol.Number(newDenominator)))
+            }
+        }
+
+        // 분수 덧셈이 적용되지 않는 경우 원래의 Add 형태로 반환
         return MathSymbol.Add(left, right)
     }
+
 
 
     private fun simplifyFraction(fraction: MathSymbol.Fraction): MathSymbol {
@@ -266,12 +295,15 @@ class Expression(private val mathSymbol: MathSymbol) {
 fun main() {
     val cases = listOf(
         Expression(
-            MathSymbol.Fraction(
-                MathSymbol.Multiply(
-                    MathSymbol.Number(5),
+            MathSymbol.Add(
+                MathSymbol.Fraction(
+                    MathSymbol.Number(10),
                     MathSymbol.Number(5)
                 ),
-                MathSymbol.Root(MathSymbol.Number(16))
+                MathSymbol.Fraction(
+                    MathSymbol.Number(5),
+                    MathSymbol.Number(4)
+                ),
             )
         ),
     )
