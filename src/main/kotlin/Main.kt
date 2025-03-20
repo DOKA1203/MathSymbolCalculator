@@ -32,6 +32,18 @@ sealed class MathSymbol {
     data class Csc(val argument: MathSymbol) : MathSymbol()
 }
 
+operator fun MathSymbol.plus(other: MathSymbol): MathSymbol.Add = MathSymbol.Add(this, other)
+
+operator fun MathSymbol.minus(other: MathSymbol): MathSymbol.Add = MathSymbol.Add(this, MathSymbol.Multiply(MathSymbol.Number(-1), other))
+
+operator fun MathSymbol.times(other: MathSymbol): MathSymbol.Multiply = MathSymbol.Multiply(this, other)
+
+operator fun MathSymbol.div(other: MathSymbol): MathSymbol.Fraction = MathSymbol.Fraction(this, other)
+
+fun MathSymbol.pow(other: MathSymbol): MathSymbol.Exponent = MathSymbol.Exponent(this, other)
+
+operator fun MathSymbol.unaryMinus(): MathSymbol.Multiply = MathSymbol.Multiply(MathSymbol.Number(-1), this)
+
 class Expression(private val mathSymbol: MathSymbol) {
     private fun wrapIfComplex(symbol: MathSymbol): String {
         return when(symbol) {
@@ -68,23 +80,23 @@ class Expression(private val mathSymbol: MathSymbol) {
             val rightDen = right.denominator
 
             if (leftNum is MathSymbol.Number && leftDen is MathSymbol.Number && rightNum is MathSymbol.Number && rightDen is MathSymbol.Number) {
-                return simplifySymbol(MathSymbol.Fraction(MathSymbol.Number(leftNum.value * rightNum.value), MathSymbol.Number(leftDen.value * rightDen.value)))
+                return simplifySymbol(MathSymbol.Number(leftNum.value * rightNum.value) / MathSymbol.Number(leftDen.value * rightDen.value))
             }
         } else if (left is MathSymbol.Fraction && right is MathSymbol.Number) {
             val leftNum = left.numerator
             if  (leftNum is MathSymbol.Number) {
-                return simplifySymbol(MathSymbol.Fraction(MathSymbol.Number(leftNum.value * right.value), left.denominator))
+                return simplifySymbol(MathSymbol.Number(leftNum.value * right.value) / left.denominator)
             }
         } else if (right is MathSymbol.Fraction &&  left is MathSymbol.Number) {
             val rightNum = right.numerator
             if  (rightNum is MathSymbol.Number) {
-                return simplifySymbol(MathSymbol.Fraction(MathSymbol.Number(rightNum.value * left.value), right.denominator))
+                return simplifySymbol(MathSymbol.Number(rightNum.value * left.value) / right.denominator)
             }
         } else if (right is MathSymbol.Number && left is MathSymbol.Number) {
 
             return MathSymbol.Number(right.value * left.value)
         }
-        return MathSymbol.Multiply(left, right)
+        return left * right
     }
     private fun simplifyAdd(symbol: MathSymbol.Add): MathSymbol {
         val left = simplifySymbol(symbol.left)
@@ -116,7 +128,7 @@ class Expression(private val mathSymbol: MathSymbol) {
                 val newDenominator = leftFraction.denominator.value * rightFraction.denominator.value
 
                 // 새 분수를 간소화해서 반환
-                return simplifyFraction(MathSymbol.Fraction(MathSymbol.Number(newNumerator), MathSymbol.Number(newDenominator)))
+                return simplifyFraction(MathSymbol.Number(newNumerator) / MathSymbol.Number(newDenominator))
             }
         }
 
@@ -297,15 +309,16 @@ fun main() {
         Expression(
             MathSymbol.Add(
                 MathSymbol.Fraction(
-                    MathSymbol.Number(10),
-                    MathSymbol.Number(5)
+                    MathSymbol.Number(1),
+                    MathSymbol.Number(10)
                 ),
                 MathSymbol.Fraction(
-                    MathSymbol.Number(5),
-                    MathSymbol.Number(4)
+                    MathSymbol.Number(2),
+                    MathSymbol.Number(10)
                 ),
             )
         ),
+        Expression(MathSymbol.Number(1) / MathSymbol.Number(10) + MathSymbol.Number(2) / MathSymbol.Number(10))
     )
 
     cases.forEach { println("$it = ${it.simplify()} = ${it.evaluate()}") } // (5 * 5)/(√16) = 25/4 = 6.25
