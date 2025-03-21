@@ -44,6 +44,9 @@ fun MathSymbol.pow(other: MathSymbol): MathSymbol.Exponent = MathSymbol.Exponent
 
 operator fun MathSymbol.unaryMinus(): MathSymbol.Multiply = MathSymbol.Multiply(MathSymbol.Number(-1), this)
 
+fun Int.toMathSymbol(): MathSymbol = MathSymbol.Number(this)
+
+
 class Expression(private val mathSymbol: MathSymbol) {
     private fun wrapIfComplex(symbol: MathSymbol): String {
         return when(symbol) {
@@ -132,8 +135,7 @@ class Expression(private val mathSymbol: MathSymbol) {
             }
         }
 
-        // 분수 덧셈이 적용되지 않는 경우 원래의 Add 형태로 반환
-        return MathSymbol.Add(left, right)
+        return left + right
     }
 
 
@@ -318,8 +320,9 @@ fun main() {
                 ),
             )
         ),
-        Expression(MathSymbol.Number(1) / MathSymbol.Number(10) + MathSymbol.Number(2) / MathSymbol.Number(10))
+        Expression(MathSymbol.Number(1) / MathSymbol.Number(10) + MathSymbol.Number(2) / MathSymbol.Number(10)),
+        Expression(1.toMathSymbol() / 10.toMathSymbol() + 2.toMathSymbol() / 10.toMathSymbol())
     )
 
-    cases.forEach { println("$it = ${it.simplify()} = ${it.evaluate()}") } // (5 * 5)/(√16) = 25/4 = 6.25
+    cases.forEach { println("$it = ${it.simplify()} = ${it.evaluate()}") }
 }
