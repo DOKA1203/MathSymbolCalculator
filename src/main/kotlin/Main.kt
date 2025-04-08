@@ -111,10 +111,10 @@ class Expression(private val mathSymbol: MathSymbol) {
             if (leftFraction.numerator is MathSymbol.Number && leftFraction.denominator is MathSymbol.Number &&
                 rightFraction.numerator is MathSymbol.Number && rightFraction.denominator is MathSymbol.Number) {
 
-                val a = (leftFraction.numerator as MathSymbol.Number).value
-                val b = (leftFraction.denominator as MathSymbol.Number).value
-                val c = (rightFraction.numerator as MathSymbol.Number).value
-                val d = (rightFraction.denominator as MathSymbol.Number).value
+                val a = leftFraction.numerator.value
+                val b = leftFraction.denominator.value
+                val c = rightFraction.numerator.value
+                val d = rightFraction.denominator.value
 
                 val newNumerator = a * d + c * b
                 val newDenominator = b * d
